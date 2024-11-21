@@ -168,3 +168,4 @@ output
 .vscode
 data
 processing
+!disturbances_planted.gdb
