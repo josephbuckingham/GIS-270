@@ -5,11 +5,10 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 
 # %%
-intiff = './CA_Forest_Harvest_1985-2020/CA_Forest_Harvest_1985-2020.tif'
-inshp = './BC_Boundary(1)/BC_Boundary.shp'
-outtiff = './outputs/forest_Harvest.tif'
+intiff = './input/CA_Forest_Fire_1985-2020/CA_Forest_Fire_1985-2020.tif'
+inshp = './input/BC_Boundary(1)/BC_Boundary.shp'
+outtiff = './output/forest_fire.tiff'
 bc = gpd.read_file(inshp)
-bc
 
 # %%
 with rasterio.open(intiff) as src: 
@@ -28,9 +27,9 @@ with rasterio.open(outtiff,'w',**out_meta) as dst:
     dst.write(out_image)
 
 # %%
-with rasterio.open('./outputs/forest_Harvest.tif') as src:
+with rasterio.open('./output/forest_fire.tiff') as src:
     plt.imshow(src.read(1))
-    plt.savefig('outputs/forest_harvest.png')
+    plt.savefig('output/forest_fire.png')
 
 
 

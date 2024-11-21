@@ -166,3 +166,5 @@ output
 *.tif
 *.shp
 .vscode
+data
+processing
