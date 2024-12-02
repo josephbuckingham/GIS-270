@@ -9,10 +9,10 @@ import rasterio
 from rasterio import features
 import os
 
-def rasterize_to_extent(in_shp, reference_tif, out_tiff):
+def rasterize_to_extent(in_shp, reference_tif, out_tiff, unique_id):
     print(reference_tif)
     shp = gpd.read_file(in_shp)
-    geom = [(geometry, value) for geometry, value in zip(shp.geometry, shp.ACTIVITY_TREATMENT_UNIT_ID)]
+    geom = [(geometry, value) for geometry, value in zip(shp.geometry, shp[unique_id])]
 
     with rasterio.open(reference_tif) as ref: 
         meta = ref.meta.copy()
@@ -69,13 +69,13 @@ def make_zonal_df(data_tiff, zones):
     return joined.reset_index()
 
 
-def make_ndvi_timeseries(polygon, zones_name):
+def make_ndvi_timeseries(polygon, zones_name, unique_id):
     tiff_dir = 'weekly_max_ndvi/data/clipped'
     tiffs = os.listdir(tiff_dir)
 
-    # zones_tiff = f'processing/{zones_name}.tiff'
-    # zones = rasterize_to_extent(polygon, os.path.join(tiff_dir, tiffs[0]), zones_tiff)
-    zones_2022 = rasterize_to_extent(polygon, os.path.join(tiff_dir, ([tiff for tiff in tiffs if int(tiff.split('.')[4][0:4]) >= 2022])[0]), f'processing/zone_test.tiff')
+    zones_tiff = f'processing/{zones_name}.tiff'
+    zones = rasterize_to_extent(polygon, os.path.join(tiff_dir, tiffs[0]), zones_tiff, unique_id)
+    zones_2022 = rasterize_to_extent(polygon, os.path.join(tiff_dir, ([tiff for tiff in tiffs if int(tiff.split('.')[4][0:4]) >= 2022])[0]), f'processing/{zones_name}_2022.tiff', unique_id)
 
     futures = []
 
@@ -89,8 +89,8 @@ def make_ndvi_timeseries(polygon, zones_name):
         tiff_path = os.path.join(tiff_dir, tiff)
         if int(tiff.split('.')[4][0:4]) >= 2022: 
             futures.append(pool.submit(make_zonal_df, tiff_path, zones_2022))
-        # else: 
-        #     futures.append(pool.submit(make_zonal_df, tiff_path, zones))
+        else: 
+            futures.append(pool.submit(make_zonal_df, tiff_path, zones))
 
     pool.shutdown(wait=True)
 
@@ -100,11 +100,25 @@ def make_ndvi_timeseries(polygon, zones_name):
 
     final: pd.DataFrame = pd.concat(dfs)
     print(final)
-    final.to_csv(f'output/{zones_name}.csv')
+    final.dropna().to_csv(f'processing/{zones_name}.csv')
+
+def add_unique_id(in_shp, out_shp):
+    os.makedirs(os.path.dirname(out_shp))
+    shp: gpd.GeoDataFrame = gpd.read_file(in_shp)
+    shp['ID'] = range(len(shp))
+    shp.to_file(out_shp)
 
 
 
 if __name__ == "__main__":
-    make_ndvi_timeseries('disturbances_planted/disturbances_planted.gdb', 'disturbances_planted')
+    add_unique_id('processing/harvest_not_planted/harvest_not_planted.shp', 'processing/harvest_not_planted_uid/harvest_not_planted_uid.shp')
+    add_unique_id('processing/fire_not_planted/fire_not_planted.shp', 'processing/fire_not_planted_uid/fire_not_planted_uid.shp')
+    add_unique_id('C:\dev\GIS-270\input\BC_Boundary\BC_Boundary.shp', 'processing/boundary_uid/boundary_uid.shp')
+
+    make_ndvi_timeseries('disturbances_planted/disturbances_planted.gdb', 'disturbances_planted', 'ACTIVITY_TREATMENT_UNIT_ID')
+    make_ndvi_timeseries('processing/harvest_not_planted_uid/harvest_not_planted_uid.shp', 'harvest_not_planted', 'ID')
+    make_ndvi_timeseries('processing/fire_not_planted_uid/fire_not_planted_uid.shp', 'fire_not_planted', 'ID')
+    make_ndvi_timeseries('processing/boundary_uid/boundary_uid.shp', 'bc_avg', 'ID')
+
 
 
